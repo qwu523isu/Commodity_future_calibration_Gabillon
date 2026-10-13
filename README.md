@@ -32,7 +32,7 @@ Risk assumptions: ACT/365F calendar time, zero expected futures price return, il
 
 ## CI
 
-`.github/workflows/risk-engine-ci.yml` runs on pushes, pull requests and manual dispatch. It installs the pinned risk dependencies on Ubuntu / Python 3.12 and runs four tests, including a 1,000-scenario CLI integration run. Tests cover valuation direction and scaling, known tail risk, configuration rejection, portfolio aggregation, reproducibility and missing quotes. No credentials or live market feed are needed.
+`.github/workflows/risk-engine-ci.yml` runs on pushes, pull requests and manual dispatch. It installs the pinned risk dependencies on Ubuntu / Python 3.12 and runs six tests, including CLI integration and real local HTTP requests. Tests cover valuation direction and scaling, known tail risk, configuration rejection, portfolio aggregation, reproducibility, missing quotes, API submission and result retrieval. No credentials or live market feed are needed.
 
 The workflow needs these committed input snapshots:
 
@@ -47,6 +47,31 @@ The EIA sample covers 2020-01-02 to 2024-04-05. The negative front-month observa
 
 The original root-level historical CSV is retained. A copy under `Input_data` supports the relative paths in the legacy scripts. Research diagnostics are included but have dependencies beyond `requirements-risk.txt` (for example SciPy for optimization, and Matplotlib for legacy plots). The original spot simulation is not the portfolio risk entry point. Prior GitHub scripts remain in Git history; local manual backup folders are not committed.
 
+## Local API prototype
+
+Start from the repository root:
+
+```sh
+python risk_api.py
+```
+
+The server binds to `127.0.0.1:8000` only. It uses the Python standard library and adds no dependencies. Routes:
+
+| Method | Route | Behaviour |
+| --- | --- | --- |
+| GET | `/health` | Health and architecture-demo label |
+| POST | `/runs` | Accept the configuration JSON, calculate synchronously, return HTTP 201 with run ID and summary |
+| GET | `/runs/{run_id}` | Read a previously completed result; unknown or failed runs return 404 |
+
+Example from another terminal (PowerShell users should use `curl.exe`):
+
+```sh
+curl http://127.0.0.1:8000/health
+curl -H "Content-Type: application/json" --data-binary @Input_data/risk_engine_config.json http://127.0.0.1:8000/runs
+```
+
+Each request saves its configuration and outputs in a separate `Output/API_Runs/{run_id}` directory. Invalid inputs return 400; internal calculation failures return 500. The API limits scenario counts to one million. The current single-process server handles one request at a time: POST waits for calculation and other requests wait too. Failed requests can leave a request configuration for debugging, but no completed result is published. There is no background queue, task-status lifecycle or authentication. This local server is not suitable for public deployment.
+
 ## Planned, not deployed
 
-An API, asynchronous worker/queue, persistent task records, server deployment and CD remain future work. Current execution is local batch processing; GitHub Actions provides CI once this branch is pushed and Actions is enabled.
+An asynchronous worker/queue, persistent task-status records, production server deployment and CD remain future work. Current execution supports local batch processing and a synchronous local API prototype; GitHub Actions provides automated CI.
