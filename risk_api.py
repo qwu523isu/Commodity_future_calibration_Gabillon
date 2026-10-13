@@ -8,7 +8,7 @@ import uuid
 from Step4b_portfolio_risk_engine import BASE, main as run_portfolio
 
 
-def create_server(port=8000, output_root=None):
+def create_server(port=8000, output_root=None, host='127.0.0.1'):
     root = Path(output_root) if output_root is not None else BASE/'Output/API_Runs'
 
     class Handler(BaseHTTPRequestHandler):
@@ -74,8 +74,8 @@ def create_server(port=8000, output_root=None):
                 return
             self.respond(201, {'run_id': run_id, 'status': 'succeeded', 'summary': summary})
 
-    # Fixed loopback binding: no authentication or production serving layer yet.
-    server = HTTPServer(('127.0.0.1', port), Handler)
+    # Loopback by default; Docker explicitly selects the container interface.
+    server = HTTPServer((host, port), Handler)
     server.timeout = 1
     return server
 
@@ -83,10 +83,11 @@ def create_server(port=8000, output_root=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=8000)
+    parser.add_argument('--host', choices=['127.0.0.1', '0.0.0.0'], default='127.0.0.1')
     parser.add_argument('--output', type=Path, default=BASE/'Output/API_Runs')
     args = parser.parse_args()
-    with create_server(args.port, args.output) as server:
-        print(f'Local risk API: http://127.0.0.1:{server.server_port}; synthetic volatility demo.', flush=True)
+    with create_server(args.port, args.output, args.host) as server:
+        print(f'Risk API listening on {args.host}:{server.server_port}; synthetic volatility demo.', flush=True)
         try:
             server.serve_forever()
         except KeyboardInterrupt:

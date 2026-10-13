@@ -55,7 +55,7 @@ Start from the repository root:
 python risk_api.py
 ```
 
-The server binds to `127.0.0.1:8000` only. It uses the Python standard library and adds no dependencies. Routes:
+The server defaults to `127.0.0.1:8000`. It uses the Python standard library and adds no dependencies. Routes:
 
 | Method | Route | Behaviour |
 | --- | --- | --- |
@@ -72,6 +72,25 @@ curl -H "Content-Type: application/json" --data-binary @Input_data/risk_engine_c
 
 Each request saves its configuration and outputs in a separate `Output/API_Runs/{run_id}` directory. Invalid inputs return 400; internal calculation failures return 500. The API limits scenario counts to one million. The current single-process server handles one request at a time: POST waits for calculation and other requests wait too. Failed requests can leave a request configuration for debugging, but no completed result is published. There is no background queue, task-status lifecycle or authentication. This local server is not suitable for public deployment.
 
+## Docker
+
+From the repository root, on a machine with Docker:
+
+```sh
+docker build -t risk-api:local .
+docker run -d --name risk-api-local -p 127.0.0.1:8000:8000 -v risk-api-results:/data risk-api:local
+curl http://127.0.0.1:8000/health
+python scripts/smoke_risk_api.py --state-file smoke-result.json
+docker logs risk-api-local
+docker stop risk-api-local
+```
+
+The image includes only the risk API, two engine modules, configuration and required data snapshots. Python 3.12 and pinned NumPy/Pandas dependencies run as user 10001. Inside the container the API explicitly binds to `0.0.0.0`; the example publishes the port only on host loopback. A named volume at `/data` retains run results after container replacement. Do not mount over `/app/Output`, which contains the required input snapshots. Local bind mounts require appropriate write permissions for user 10001.
+
+CI first runs the six Python tests, then builds the Docker image and checks the actual container over HTTP. It submits a 1,000-scenario risk run, retrieves the result, replaces the container while retaining its named volume, and retrieves the same result again. Images are built for verification, not published to a registry or deployed to a server. The Python base image tag is maintained upstream; it is not pinned to an immutable digest.
+
+Docker port publishing reference: [Docker documentation](https://docs.docker.com/engine/network/port-publishing/).
+
 ## Planned, not deployed
 
-An asynchronous worker/queue, persistent task-status records, production server deployment and CD remain future work. Current execution supports local batch processing and a synchronous local API prototype; GitHub Actions provides automated CI.
+An asynchronous worker/queue, persistent task-status records, production server deployment and CD remain future work. Current execution supports local batch processing and a synchronous API prototype packaged in Docker; GitHub Actions verifies tests and container behaviour. This remains a single-request-at-a-time demonstration server with synthetic volatility, not a production API.
