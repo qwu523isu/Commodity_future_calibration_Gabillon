@@ -5,7 +5,7 @@ import os
 # -----------------------------
 # Paths
 # -----------------------------
-base_path = r"G:\My Drive\1_Career\Working Note\Related_Codes\7_Gabillon_calibration"
+base_path = os.path.dirname(os.path.abspath(__file__))
 input_file = os.path.join(base_path, "Output", "Step1_Calibrate_Gabillon_model_parameters", "Gabillon_calibration_results.csv")
 output_dir = os.path.join(base_path, "Output", "Step3a_Synthetic_Option_Vols")
 os.makedirs(output_dir, exist_ok=True)

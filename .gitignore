@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.repo-update/
+0_versioncontrol/
+
+# Keep the two saved inputs needed by the CI end-to-end test.
+Output/*
+!Output/Step1a_EIA_Preparation/
+Output/Step1a_EIA_Preparation/*
+!Output/Step1a_EIA_Preparation/EIA_WTI_calibration_input.csv
+!Output/Step1c_EIA_Full_Sample/
+Output/Step1c_EIA_Full_Sample/*
+!Output/Step1c_EIA_Full_Sample/EIA_calibration_results.csv
