@@ -3,76 +3,114 @@ import pandas as pd
 import os
 from scipy.optimize import minimize
 
-base_path = r"G:\My Drive\1_Career\Working Note\Related_Codes\7_Gabillon_calibration"
-output_dir = os.path.join(base_path, "Output", "Step1_Calibrate_Gabillon_model_parameters")
-os.makedirs(output_dir, exist_ok=True)
-
-constant_maturity_curve_df = pd.read_csv(r"G:\My Drive\1_Career\Working Note\Related_Codes\7_Gabillon_calibration\Input_data\wti_futures_bbg_historical_constant_maturity.csv")
-
-print(constant_maturity_curve_df)
-df = constant_maturity_curve_df
-df["Date"] = pd.to_datetime(df["Date"])
-
-# Step 1: Select subset maturities (1M, 3M, 6M, 12M)
-subset_cols = ["1M", "3M", "6M", "12M"]
-maturities = np.array([1/12, 3/12, 6/12, 12/12]) # years
-# Reshape into long format
-long_df = df.melt(id_vars = "Date", 
-                  value_vars = subset_cols,
-                  var_name = "Maturity",
-                  value_name = "Price")
-# Map maturity labels to year fractions
-maturity_map = {"1M": 1/12, "3M": 3/12, "6M": 6/12, "12M": 12/12}
-long_df["Maturity"] = long_df["Maturity"].map(maturity_map)
-print(long_df)
-
-# Step 2: Gabillon forward log-price function
+# -----------------------------
+# Gabillon forward log-price function
+# -----------------------------
 def gabillon_forward(T, kappa_X, kappa_Y, X0, Y0):
     BX = np.exp(-kappa_X * T)
     BY = np.exp(-kappa_Y * T)
     return X0 * BX + Y0 * BY
 
-# Step 3: Calibration routine for one date
-def calibrate_for_date(subdf):
+# -----------------------------
+# Bound diagnostics
+# -----------------------------
+PARAM_NAMES = ["kappa_X", "kappa_Y", "X0", "Y0"]
+
+def bound_flags(x, bounds, tol=1e-6):
+    """One bool per parameter: is it resting on either of its bounds?"""
+    return [bool(abs(xi - lo) < tol or abs(xi - hi) < tol)
+            for xi, (lo, hi) in zip(x, bounds)]
+
+# -----------------------------
+# Calibration routine for one date
+# -----------------------------
+def calibrate_for_date(subdf, bounds=None):
+    T = subdf["Maturity"].values
+    F_mkt = subdf["Price"].values
+    logS0 = np.log(F_mkt[0])
+
     def objective(params):
         kappa_X, kappa_Y, X0, Y0 = params
-        errors = []
-        for T, Fmkt in zip(subdf["Maturity"], subdf["Price"]):
-            F_model = np.exp(gabillon_forward(T, kappa_X, kappa_Y, X0, Y0))
-            errors.append((Fmkt - F_model)**2)
-        return np.sum(errors)
+        BX = np.exp(-kappa_X * T)
+        BY = np.exp(-kappa_Y * T)
+        fitted = np.exp(X0 * BX + Y0 * BY)
+        residual = fitted - F_mkt
+        jacobian = fitted[:, None] * np.column_stack(
+            (-T * X0 * BX, -T * Y0 * BY, BX, BY)
+        )
+        return residual @ residual, 2 * jacobian.T @ residual
 
-    # Initial guess
-    logS0 = np.log(subdf["Price"].iloc[0])
     x0 = [1.0, 0.2, 0.0, logS0]
-    bounds = [(0.01, 5), (0.01, 1), (-2,2), (logS0-1, logS0+1)]
-
-# Step 4: loop over all dates
-# Step 4: Loop over all dates and store calibration results
-results = []
-for d, subdf in long_df.groupby("Date"):
+    if bounds is None:
+        bounds = [(0.01, 5), (0.0, 1), (-2, 2), (logS0 - 1, logS0 + 1)]
     res = minimize(
-        lambda params: np.sum([
-            (Fmkt - np.exp(gabillon_forward(T, *params)))**2
-            for T, Fmkt in zip(subdf["Maturity"], subdf["Price"])
-        ]),
-        x0=[1.0, 0.2, 0.0, np.log(subdf["Price"].iloc[0])],
-        bounds=[(0.01,5), (0.01,1), (-2,2), 
-                (np.log(subdf["Price"].iloc[0])-1, np.log(subdf["Price"].iloc[0])+1)],
-        method="L-BFGS-B"
+        objective, x0, jac=True, bounds=bounds, method="L-BFGS-B",
+        options={"ftol": 1e-15, "gtol": 1e-12, "maxiter": 5000, "maxls": 50},
     )
-    kappa_X, kappa_Y, X0, Y0 = res.x
-    results.append({
-        "Date": d, "kappa_X": kappa_X, "kappa_Y": kappa_Y, "X0": X0, "Y0": Y0
-    })
+    return res, bounds
 
-output_file = os.path.join(output_dir, "Gabillon_calibration_results.csv")
-param_df = pd.DataFrame(results)
-param_df.to_csv(output_file, index=False)
+def main():
+    # -----------------------------
+    # Paths
+    # -----------------------------
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    input_file = os.path.join(base_path, "Input_data", "wti_futures_bbg_historical_constant_maturity.csv")
+    output_dir = os.path.join(base_path, "Output", "Step1_Calibrate_Gabillon_model_parameters")
+    os.makedirs(output_dir, exist_ok=True)
 
-print(param_df.head())
+    # -----------------------------
+    # Load data
+    # -----------------------------
+    df = pd.read_csv(input_file, parse_dates=["Date"])
+
+    # Select subset maturities (1M, 3M, 6M, 12M)
+    subset_cols = ["1M", "3M", "6M", "12M"]
+    maturity_map = {"1M": 1/12, "3M": 3/12, "6M": 6/12, "12M": 12/12}
+
+    # Reshape into long format, mapping maturity labels to year fractions
+    long_df = df.melt(id_vars="Date",
+                      value_vars=subset_cols,
+                      var_name="Maturity",
+                      value_name="Price")
+    long_df["Maturity"] = long_df["Maturity"].map(maturity_map)
+
+    print(f"Loaded {len(df)} dates from {os.path.basename(input_file)}")
+    print(f"Fitting maturities: {subset_cols}")
+
+    # -----------------------------
+    # Loop over all dates and store calibration results
+    # -----------------------------
+    results = []
+    for d, subdf in long_df.groupby("Date"):
+        res, bounds = calibrate_for_date(subdf)
+        kappa_X, kappa_Y, X0, Y0 = res.x
+
+        row = {"Date": d, "kappa_X": kappa_X, "kappa_Y": kappa_Y, "X0": X0, "Y0": Y0,
+               "converged": bool(res.success)}
+        row.update({f"on_bound_{name}": flag
+                    for name, flag in zip(PARAM_NAMES, bound_flags(res.x, bounds))})
+        results.append(row)
+
+    param_df = pd.DataFrame(results)
+    output_file = os.path.join(output_dir, "Gabillon_calibration_results.csv")
+    param_df.to_csv(output_file, index=False)
+
+    # -----------------------------
+    # Diagnostics summary
+    # -----------------------------
+    n = len(param_df)
+    print(f"\nCalibrated {n} dates -> {output_file}")
+    print(f"  converged: {param_df['converged'].sum()} / {n} "
+          f"({100 * param_df['converged'].mean():.1f}%)")
+    print("  parameters resting on a bound:")
+    for name in PARAM_NAMES:
+        pct = 100 * param_df[f"on_bound_{name}"].mean()
+        flag = "   <-- not an estimate, a bound artefact" if pct > 20 else ""
+        print(f"    {name:8s} {pct:6.2f}%{flag}")
+
+    print()
+    print(param_df.head())
 
 
-
-
-     
+if __name__ == "__main__":
+    main()

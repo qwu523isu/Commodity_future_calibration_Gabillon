@@ -1,0 +1,16 @@
+{
+  "valuation_date": "2024-04-05",
+  "horizon_date": "2024-04-08",
+  "scenario_count": 100000,
+  "seed": 42,
+  "confidence": 0.95,
+  "synthetic_volatility": {
+    "sigma_X": 0.35,
+    "sigma_Y": 0.20,
+    "rho": 0.30
+  },
+  "positions": [
+    {"contract": "CLK2024", "quantity": 1, "multiplier": 1000},
+    {"contract": "CLM2024", "quantity": -1, "multiplier": 1000}
+  ]
+}

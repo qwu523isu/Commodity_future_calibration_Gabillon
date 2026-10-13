@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # -----------------------------
 # Paths
 # -----------------------------
-base_path = r"G:\My Drive\1_Career\Working Note\Related_Codes\7_Gabillon_calibration"
+base_path = os.path.dirname(os.path.abspath(__file__))
 input_file = os.path.join(base_path, "Output", "Step1_Calibrate_Gabillon_model_parameters", "Gabillon_calibration_results.csv")
 futures_file = os.path.join(base_path, "Input_data", "wti_futures_bbg_historical_constant_maturity.csv")
 
@@ -38,9 +38,9 @@ rmse_results = []
 for _, row in params_df.iterrows():
     d = row["Date"]
     subdf = futures_df[futures_df["Date"] == d][subset_cols].iloc[0]
-    
+
     kappa_X, kappa_Y, X0, Y0 = row["kappa_X"], row["kappa_Y"], row["X0"], row["Y0"]
-    
+
     errors = []
     for col in subset_cols:
         T = maturity_map[col]
