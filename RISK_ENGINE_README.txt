@@ -16,7 +16,7 @@
 测试使用临时目录，不覆盖正常运行结果。
 CI配置：.github/workflows/risk-engine-ci.yml（GitHub Actions）。
 推送、Pull Request或手动触发后，在Ubuntu、Python 3.12环境安装
-requirements-risk.txt并运行上述四项测试，包含1000个情景的端到端计算。
+requirements-risk.txt并运行六项测试，包含1000个情景的端到端计算和本地HTTP请求。
 不重新校准，不运行10万情景的完整作业，不需要密钥或外部数据服务。
 必须提交两个现有测试输入，.gitignore已保留它们：
   Output/Step1a_EIA_Preparation/EIA_WTI_calibration_input.csv
@@ -28,4 +28,8 @@ requirements-risk.txt并运行上述四项测试，包含1000个情景的端到�
 推送后在Actions页面查看Risk Engine CI；本地通过不等于云端已通过。
 如需禁止未通过测试的PR合并，需在GitHub分支保护或规则集中要求
 “Python 3.12 risk tests”检查通过；工作流本身不会自动启用合并限制。
-目前只配置CI，未部署CD、API或服务器。
+本地API：python risk_api.py，仅监听127.0.0.1:8000。
+GET /health检查服务；POST /runs提交完整配置JSON；GET /runs/{run_id}查询成功结果。
+POST同步计算，完成后返回201、run_id和风险摘要；每次运行单独保存输出。
+API串行处理请求，尚无后台队列、认证、生产服务器或CD。
+具体请求示例见README.md。
