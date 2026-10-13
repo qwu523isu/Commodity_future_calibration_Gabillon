@@ -87,10 +87,10 @@ docker stop risk-api-local
 
 The image includes only the risk API, two engine modules, configuration and required data snapshots. Python 3.12 and pinned NumPy/Pandas dependencies run as user 10001. Inside the container the API explicitly binds to `0.0.0.0`; the example publishes the port only on host loopback. A named volume at `/data` retains run results after container replacement. Do not mount over `/app/Output`, which contains the required input snapshots. Local bind mounts require appropriate write permissions for user 10001.
 
-CI first runs the six Python tests, then builds the Docker image and checks the actual container over HTTP. It submits a 1,000-scenario risk run, retrieves the result, replaces the container while retaining its named volume, and retrieves the same result again. Images are built for verification, not published to a registry or deployed to a server. The Python base image tag is maintained upstream; it is not pinned to an immutable digest.
+CI first runs the six Python tests, then builds the Docker image and checks the actual container over HTTP. It submits a 1,000-scenario risk run, retrieves the result, replaces the container while retaining its named volume, and retrieves the same result again. After successful checks on a push to main, it publishes the same tested image to GHCR with a source-commit tag and records its immutable digest. PRs do not publish. The Python base image tag is maintained upstream; it is not pinned to an immutable digest.
 
 Docker port publishing reference: [Docker documentation](https://docs.docker.com/engine/network/port-publishing/).
 
 ## Planned, not deployed
 
-An asynchronous worker/queue, persistent task-status records, production server deployment and CD remain future work. Current execution supports local batch processing and a synchronous API prototype packaged in Docker; GitHub Actions verifies tests and container behaviour. This remains a single-request-at-a-time demonstration server with synthetic volatility, not a production API.
+An asynchronous worker/queue, persistent task-status records and automated server deployment remain future work. Current execution supports local batch processing and a synchronous API prototype packaged in Docker; GitHub Actions verifies and delivers tested images. See [DEPLOYMENT.md](DEPLOYMENT.md) for publication, cloud target considerations and manual deployment/rollback. This remains a single-request-at-a-time demonstration server with synthetic volatility, not a production API.

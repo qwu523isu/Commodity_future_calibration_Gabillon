@@ -39,4 +39,6 @@ Docker：
   docker run -d --name risk-api-local -p 127.0.0.1:8000:8000 -v risk-api-results:/data risk-api:local
 数据卷保存结果；容器内使用非root用户，监听0.0.0.0；宿主机端口仅映射到本机。
 CI新增镜像构建、API真实请求及容器替换后结果持久化检查。
-当前只验证镜像，尚未发布镜像仓库、部署服务器或配置CD。
+main分支push通过全部检查后，发布同一镜像到GHCR，标签包含完整提交SHA。
+PR不发布镜像；Actions摘要记录镜像digest，部署和回滚方案见DEPLOYMENT.md。
+首次真实发布需合并此更新后验证；尚未部署服务器或配置自动服务器CD。

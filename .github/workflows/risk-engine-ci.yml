@@ -34,6 +34,9 @@ jobs:
     needs: risk-tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Check out project
         uses: actions/checkout@v6
@@ -54,6 +57,18 @@ jobs:
           docker rm -f risk-api-ci
           docker run -d --name risk-api-ci -p 127.0.0.1:8000:8000 -v risk-ci-results:/data risk-api:ci
           python scripts/smoke_risk_api.py --state-file "${{ runner.temp }}/risk-smoke.json" --verify-only
+      - name: Publish tested image to GHCR on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          TAG="$IMAGE:sha-$GITHUB_SHA"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag risk-api:ci "$TAG"
+          docker push "$TAG"
+          DIGEST=$(docker image inspect "$TAG" --format '{{index .RepoDigests 0}}')
+          printf '## Published risk API\n\nCommit: `%s`\n\nImage tag: `%s`\n\nImmutable image: `%s`\n' "$GITHUB_SHA" "$TAG" "$DIGEST" >> "$GITHUB_STEP_SUMMARY"
       - name: Show container logs
         if: always()
         run: docker logs risk-api-ci || true
@@ -62,3 +77,4 @@ jobs:
         run: |
           docker rm -f risk-api-ci || true
           docker volume rm risk-ci-results || true
+          docker logout ghcr.io || true
