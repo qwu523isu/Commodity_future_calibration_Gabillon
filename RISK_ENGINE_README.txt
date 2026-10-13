@@ -33,3 +33,10 @@ GET /health检查服务；POST /runs提交完整配置JSON；GET /runs/{run_id}�
 POST同步计算，完成后返回201、run_id和风险摘要；每次运行单独保存输出。
 API串行处理请求，尚无后台队列、认证、生产服务器或CD。
 具体请求示例见README.md。
+
+Docker：
+  docker build -t risk-api:local .
+  docker run -d --name risk-api-local -p 127.0.0.1:8000:8000 -v risk-api-results:/data risk-api:local
+数据卷保存结果；容器内使用非root用户，监听0.0.0.0；宿主机端口仅映射到本机。
+CI新增镜像构建、API真实请求及容器替换后结果持久化检查。
+当前只验证镜像，尚未发布镜像仓库、部署服务器或配置CD。

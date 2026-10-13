@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 .repo-update/
 0_versioncontrol/
+smoke-result.json
 
 # Keep the two saved inputs needed by the CI end-to-end test.
 Output/*

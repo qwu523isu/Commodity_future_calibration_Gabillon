@@ -28,3 +28,37 @@ jobs:
         run: python -m pip install -r requirements-risk.txt
       - name: Run financial invariants and CLI integration tests
         run: python -m unittest discover -s tests -v
+
+  container-tests:
+    name: Docker API smoke test
+    needs: risk-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up smoke-test client
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build risk API image
+        run: docker build -t risk-api:ci .
+      - name: Start API with persistent results
+        run: docker run -d --name risk-api-ci -p 127.0.0.1:8000:8000 -v risk-ci-results:/data risk-api:ci
+      - name: Check health, calculate risk and retrieve result
+        run: python scripts/smoke_risk_api.py --state-file "${{ runner.temp }}/risk-smoke.json"
+      - name: Recreate container and verify persisted result
+        run: |
+          docker rm -f risk-api-ci
+          docker run -d --name risk-api-ci -p 127.0.0.1:8000:8000 -v risk-ci-results:/data risk-api:ci
+          python scripts/smoke_risk_api.py --state-file "${{ runner.temp }}/risk-smoke.json" --verify-only
+      - name: Show container logs
+        if: always()
+        run: docker logs risk-api-ci || true
+      - name: Clean up CI container and volume
+        if: always()
+        run: |
+          docker rm -f risk-api-ci || true
+          docker volume rm risk-ci-results || true
